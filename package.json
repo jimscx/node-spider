@@ -1,0 +1,31 @@
+{
+  "name": "node-spider",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jimscx/node-spider.git"
+  },
+  "keywords": [
+    "ndoe",
+    "spider",
+    "cherrio"
+  ],
+  "author": "jimscx",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jimscx/node-spider/issues"
+  },
+  "homepage": "https://github.com/jimscx/node-spider#readme",
+  "dependencies": {
+    "cheerio": "^0.22.0",
+    "eventproxy": "^0.3.5",
+    "express": "^4.14.0",
+    "request": "^2.78.0",
+    "superagent": "^2.3.0"
+  }
+}
