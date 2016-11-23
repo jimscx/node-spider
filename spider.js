@@ -1,75 +1,119 @@
-var eventproxy=require('eventproxy');
-var request=require('superagent');
-var cheerio=require('cheerio');
-var url=require('url');
-var express=require('express');
+
+var request = require('superagent');
+var cheerio = require('cheerio');
+var url = require('url');
+var express = require('express');
+var app = express();
 var async = require('async');
+
+var EventProxy  = require('eventproxy');
+var ep = new EventProxy();
+
 var queryString = require('querystring');
 
-var urls = [];
 
-var options = {
-    utf8:'✓',
-    start_day:'2016-11-15',
-    end_day:'2016-11-16',
-    low_cost:'',
-    high_cost:'',
-    sort:'0',
-    name:'',
-    clear_day:'',
-    page:'2'
-};
+var urlsArray = [], //存放爬取网址
+    pageUrls = [],  //存放收集文章页面网站
+    pageNum = 10;  //要爬取的页数
 
-var queryParams = queryString.stringify(options);
-
-var url1 = 'http://www.fishtrip.cn/taiwan/taibei?' + queryParams;
-console.log(url1)
-urls.push(url1);
-urls.push('http://www.fishtrip.cn/taiwan/taibei?utf8=%E2%9C%93&start_day=2016-11-15&end_day=2016-11-16&low_cost=&high_cost=&sort=0&name=&clear_day=&page=1')
-
-var result = [];
-function fetchData(urls) {
-    urls.forEach(function(url) {
-        request.get(url)
-            .end(function(err, res) {
-                if (err) cb(err)
-
-                var $ = cheerio.load(res.text);
-
-                $('.fltriple__item').each(function(index, element) {
-                    var id = $(this).children().attr('id');
-                    var name = $(this).children().attr('data-ga-name');
-                    var price = $(this).children().attr('data-ga-price');
-                    var gmaps = $(this).children().attr('data-gmaps');
-                    var imgSrc = $(this).children().find('.house-item-image img').attr('data-original');
-                    var address = $(this).children().find('.hiinfo__location').text(); 
-                    var data = {
-                        id: id,
-                        name: name,
-                        price: price,
-                        gmaps: gmaps,
-                        imgSrc: imgSrc,
-                        address: address
-                    }
-                    result.push(data);
-                })
-               
-            })
-           
-    })
-
-console.log(result);
-return result;
-
+for(var i=0 ; i<= 2 ; i++){
+    pageUrls.push('http://taiwan.zizaike.com/search//a14-b10-p' + i + '/?');
 }
 
+console.log(pageUrls);
 
-fetchData(urls);
+app.get('/', function(req, res) {
 
-
-
-
-var app = express();
-app.listen(3000,function() {
-    console.log('app listtening port 3000')
 })
+
+pageUrls.forEach(function(url) {
+    request.get(url)
+        .end(function(err,res){
+            if(err) console.log(err)
+            var $ = cheerio.load(res.text);
+            var curPageUrls = $('.div_home_photo a');
+
+            for(var i = 0 ; i < curPageUrls.length ; i++){
+                var imgUrl = 'http://taiwan.zizaike.com' + curPageUrls.eq(i).attr('href');
+                //console.log(imgUrl);
+                urlsArray.push(imgUrl);
+                // 相当于一个计数器
+                ep.emit('finishImgUrl', imgUrl);
+            }
+        });
+})
+
+ep.after('finishImgUrl',pageUrls.length*25, function(list){
+    console.log('获取到的酒店数量是' + list.length + '\n' + '地址是：' + list);
+    var concurrencyCount = 0;
+    var fetchStart = new Date().getTime();
+
+    var fetchData = function(url, cb) {
+        concurrencyCount++;
+        console.log('现在的并发数是', concurrencyCount, '，正在抓取的是', url);
+        request.get(url)
+            .end(function(err, res){
+                if(err) cb(err)
+                var time = new Date().getTime() - fetchStart;
+                console.log('抓取 ' + url + ' 成功', '，耗时' + time + '毫秒');
+                concurrencyCount--;
+                var $ = cheerio.load(res.text);
+                var result = {
+                    name: $('#line1 h3').text(),
+                    price: parseInt($('.price b').html()),
+                    address: $('#line2 p').attr('title'),
+                    score: parseFloat($('#line3 p b').text()),
+                    recommend: $('#comments_filter a').eq(1).text().toString(),
+                    notRecommend:$('#comments_filter a').eq(2).html()
+                };
+                console.log(result)
+                cb(null, result);
+            })
+    }
+
+    async.mapLimit(list, 5, function(url, cb) {
+        fetchData(url, cb)},
+        function(err, result){
+            console.log(result.length)
+        }
+    )
+})
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+app.listen(3000, function (req, res) {
+    console.log('app is running at port 3000');
+});
